@@ -7,7 +7,7 @@ class Player {
   }
 
   attack() {
-    // 플레이어의 공격
+    // 플레이어의 공격sssß
   }
 }
 
