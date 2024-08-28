@@ -204,7 +204,7 @@ const battle = async (stage, player, monster) => {
 
     console.log(
       chalk.green(
-        `\n1. 전광석화(${player.damage}) 2. 전기쇼크(${player.damage * 2}) 3. 스파크(${player.damage * 3}) 4. 10만볼트(${player.damage * 5}) 5. 일렉트릭 월(방어) 6. 체인 라이트닝(랜덤 연속 공격) 7. 도망간다!`
+        `\n1. 전광석화(${player.damage}) 2. 전기쇼크(${player.damage * 2}) 3. 스파크(${player.damage * 3}) 4. 10만볼트(${player.damage * 5}) 5. 일렉트릭 월(방어) 6. 체인 라이트닝(${player.damage} X ?) 7. 도망간다!`
       )
     );
     const choice = readlineSync.question("당신의 선택은? ");
@@ -215,36 +215,36 @@ const battle = async (stage, player, monster) => {
       case "1":
         logs.push(chalk.green(`\n가랏! ${player.name}! 전광석화!!!`));
         console.log(logs[logs.length - 1]);
-        await delay(500);
         attackResult = player.quickAttack(monster);
         break;
       case "2":
         logs.push(chalk.green(`\n가랏! ${player.name}! 전기쇼크!!!`));
         console.log(logs[logs.length - 1]);
-        await delay(500);
         attackResult = player.thunderShock(monster);
         break;
       case "3":
         logs.push(chalk.green(`\n가랏! ${player.name}! 스파크!!!`));
         console.log(logs[logs.length - 1]);
-        await delay(500);
         attackResult = player.spark(monster);
         break;
       case "4":
         logs.push(chalk.green(`\n가랏! ${player.name}! 10만볼트!!!`));
         console.log(logs[logs.length - 1]);
-        await delay(500);
         attackResult = player.thunderBolt(monster);
         break;
       case "5": // 일렉트릭 월
         const wallResult = player.electricWall();
         if (wallResult.success) {
           logs.push(chalk.green(`\n가랏! ${player.name}! 일렉트릭 월!!!`));
+          console.log(logs[logs.length - 1]);
+          await delay(500);
           logs.push(
             chalk.green(`${player.name}의 일렉트릭 월이 활성화되었습니다!`)
           );
         } else {
-          logs.push(chalk.red(`\n가랏! ${player.name}! 일렉트릭 월!!!`));
+          logs.push(chalk.green(`\n가랏! ${player.name}! 일렉트릭 월!!!`));
+          console.log(logs[logs.length - 1]);
+          await delay(500);
           logs.push(chalk.red(`${player.name}의 일렉트릭 월이 실패했습니다!`));
         }
         console.log(logs[logs.length - 1]);
@@ -384,18 +384,18 @@ export async function startGame() {
   console.clear();
 
   // 인트로 메시지 추가
-  // await typeEffect(
-  //   "당신은 앞으로 피카츄와 함께 10개의 스테이지를 도전하게됩니다.\n",
-  //   50
-  // );
-  // await delay(1000); // 1초 대기 후 게임 시작
-  // await typeEffect(
-  //   "10개의 스테이지를 클리어하고 최고의 포켓몬에 도전하세요!\n",
-  //   50
-  // );
-  // await delay(1000); // 1초 대기 후 게임 시작
-  // await typeEffect("그럼, 행운을 빕니다! Good Luck!\n", 50);
-  // await delay(2000); // 1초 대기 후 게임 시작
+  await typeEffect(
+    "당신은 앞으로 피카츄와 함께 10개의 스테이지를 도전하게됩니다.\n",
+    50
+  );
+  await delay(1000); // 1초 대기 후 게임 시작
+  await typeEffect(
+    "10개의 스테이지를 클리어하고 최고의 포켓몬에 도전하세요!\n",
+    50
+  );
+  await delay(1000); // 1초 대기 후 게임 시작
+  await typeEffect("그럼, 행운을 빕니다! Good Luck!\n", 50);
+  await delay(2000); // 1초 대기 후 게임 시작
 
   const player = new Player();
   let stage = 1;
