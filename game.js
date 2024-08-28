@@ -11,11 +11,15 @@ class Player {
     this.damage = 30;
     this.isEvolved = false; // 진화 여부 확인
     this.acc = {
+      // 스킬 명중률
       quickAttack: 100,
       thunderShock: 80,
       spark: 70,
       thunderBolt: 50,
+      electricWall: 60,
+      chainLightning: 100,
     };
+    this.electricWallActive = false; // 일렉트릭 월 활성화 상태
   }
 
   lvUp() {
@@ -54,6 +58,47 @@ class Player {
     return this.attackWithAccuracy("thunderBolt", monster, 5);
   }
 
+  electricWall() {
+    const hitChance = this.acc["electricWall"];
+    const randomChance = Math.round(Math.random() * 100);
+
+    if (randomChance <= hitChance) {
+      this.electricWallActive = true;
+      return { success: true }; // 일렉트릭 월 성공적으로 사용
+    } else {
+      return { success: false }; // 일렉트릭 월 실패
+    }
+  }
+
+  chainLightning(monster) {
+    let attacks = Math.floor(Math.random() * 2) + 2; // 2~3회 랜덤으로 공격
+    let totalDamage = 0; // 총 데미지 초기화
+
+    for (let i = 0; i < attacks; i++) {
+      const attackResult = this.attackWithAccuracy(
+        "chainLightning",
+        monster,
+        1
+      );
+      if (attackResult.success) {
+        totalDamage += attackResult.skillDamage; // attackWithAccuracy에서 반환된 데미지를 누적
+      }
+    }
+
+    if (totalDamage > 0) {
+      return {
+        success: true,
+        skillDamage: totalDamage,
+        attacks: attacks,
+      };
+    } else {
+      return {
+        success: false,
+        attacks: attacks,
+      };
+    }
+  }
+
   run() {
     return 50 >= Math.round(Math.random() * 100);
   }
@@ -90,12 +135,18 @@ class Monster {
     const randomChance = Math.round(Math.random() * 100);
 
     if (randomChance <= hitChance) {
-      player.hp -= this.damage * skill.damageMultiplier;
-      return {
-        success: true,
-        skillName: skill.name,
-        damage: this.damage * skill.damageMultiplier,
-      };
+      // 일렉트릭 월이 활성화되어 있으면 공격 무효화
+      if (player.electricWallActive) {
+        player.electricWallActive = false; // 한 번 공격 방어 후 비활성화
+        return { success: false, skillName: skill.name, blocked: true };
+      } else {
+        player.hp -= this.damage * skill.damageMultiplier;
+        return {
+          success: true,
+          skillName: skill.name,
+          damage: this.damage * skill.damageMultiplier,
+        };
+      }
     } else {
       return { success: false, skillName: skill.name };
     }
@@ -153,7 +204,7 @@ const battle = async (stage, player, monster) => {
 
     console.log(
       chalk.green(
-        `\n1. 전광석화(${player.damage}) 2. 전기쇼크(${player.damage * 2}) 3. 스파크(${player.damage * 3}) 4. 10만볼트(${player.damage * 5}) 5. 도망간다!`
+        `\n1. 전광석화(${player.damage}) 2. 전기쇼크(${player.damage * 2}) 3. 스파크(${player.damage * 3}) 4. 10만볼트(${player.damage * 5}) 5. 일렉트릭 월(방어) 6. 체인 라이트닝(랜덤 연속 공격) 7. 도망간다!`
       )
     );
     const choice = readlineSync.question("당신의 선택은? ");
@@ -185,7 +236,33 @@ const battle = async (stage, player, monster) => {
         await delay(500);
         attackResult = player.thunderBolt(monster);
         break;
-      case "5": // 도망치기
+      case "5": // 일렉트릭 월
+        const wallResult = player.electricWall();
+        if (wallResult.success) {
+          logs.push(chalk.green(`\n가랏! ${player.name}! 일렉트릭 월!!!`));
+          logs.push(
+            chalk.green(`${player.name}의 일렉트릭 월이 활성화되었습니다!`)
+          );
+        } else {
+          logs.push(chalk.red(`\n가랏! ${player.name}! 일렉트릭 월!!!`));
+          logs.push(chalk.red(`${player.name}의 일렉트릭 월이 실패했습니다!`));
+        }
+        console.log(logs[logs.length - 1]);
+        await delay(500);
+        break;
+
+      case "6": // 체인 라이트닝
+        logs.push(chalk.green(`\n가랏! ${player.name}! 체인 라이트닝!!!`));
+        console.log(logs[logs.length - 1]);
+        await delay(500);
+        attackResult = player.chainLightning(monster);
+        logs.push(
+          chalk.green(
+            `${player.name}가 체인 라이트닝으로 ${attackResult.attacks}번 공격했습니다!`
+          )
+        );
+        break;
+      case "7": // 도망가기
         if (stage === 10) {
           logs.push(chalk.redBright("\n최종보스는 도망갈 수 없습니다!"));
           console.log(logs[logs.length - 1]);
@@ -203,13 +280,15 @@ const battle = async (stage, player, monster) => {
           break;
         }
       default:
-        logs.push(chalk.red("\n잘못된 선택입니다."));
+        logs.push(chalk.red("\n잘못된 선택입니다. 다시 선택하세요"));
         vaildChoice = false;
     }
-
-    if (vaildChoice && choice !== "5") {
+    // 플레이어가 몬스터를 공격
+    if (vaildChoice && choice !== "7") {
       await delay(500);
-      if (attackResult.success) {
+
+      // attackResult가 정의되어 있는지 확인
+      if (attackResult && attackResult.success) {
         logs.push(chalk.white(`${player.name}의 공격이 명중했습니다! `));
         logs.push(
           chalk.white(`${attackResult.skillDamage}의 피해를 입혔습니다!`)
@@ -220,55 +299,68 @@ const battle = async (stage, player, monster) => {
           await delay(500);
           return false; // 배틀 종료
         }
-      } else {
+      } else if (attackResult && !attackResult.success) {
         logs.push(chalk.red(`${player.name}의 공격이 빗나갔습니다...`));
       }
     }
 
     // 몬스터가 플레이어를 공격
     if (player.hp > 0 && monster.hp > 0) {
-      // 플레이어와 몬스터 모두 생존 시
       await delay(500);
-      const monsterAttack = monster.attack(player);
-      if (monsterAttack.success) {
-        logs.push(
-          chalk.red(
-            `야생의 ${monster.name}이(가) ${monsterAttack.skillName}를 사용했다! ${monsterAttack.damage}의 피해를 입었다!`
-          )
-        );
-        if (player.hp <= 0) {
-          await delay(500);
-          logs.push(chalk.redBright(`\n${player.name}은(는) 쓰러졌다...!`));
-          await delay(500);
-          logs.push(chalk.white(`당신은 눈앞이 깜깜해졌다!`));
-          await delay(500);
-          console.clear();
-          displayStatus(stage, player, monster);
-          logs.forEach((log) => console.log(log));
-          console.log(chalk.yellow("피카로그를 재도전 하실꺼면 1을 누르세요."));
-          console.log(chalk.yellow("피카로그를 포기하려면 2를 누르세요."));
-          const choice = readlineSync.question("당신의 선택은? ");
 
-          if (choice === "1") {
-            console.log(chalk.green("피카로그를 재도전 합니다..."));
-            await delay(500);
-            console.log(chalk.green("Good Luck...!"));
-            await delay(1500);
-            return "restart"; // 재시작 선택 시 "restart" 반환
-          } else {
-            console.log(chalk.green("게임을 종료합니다. 감사합니다!"));
-            return "quit"; // 포기 선택 시 "quit" 반환
-          }
-        }
-      } else {
+      // 일렉트릭 월이 활성화된 경우
+      if (player.electricWallActive) {
         logs.push(
-          chalk.red(
-            `야생의 ${monster.name}이(가) ${monsterAttack.skillName}를 사용했지만 빗나갔다!`
-          )
+          chalk.blue(`${monster.name}의 공격이 일렉트릭 월에 의해 막혔다!`)
         );
+        player.electricWallActive = false;
+      } else {
+        // 일렉트릭 월이 활성화되지 않은 경우 몬스터의 공격을 처리
+        const monsterAttack = monster.attack(player);
+
+        if (monsterAttack.success) {
+          logs.push(
+            chalk.red(
+              `야생의 ${monster.name}이(가) ${monsterAttack.skillName}를 사용했다! ${monsterAttack.damage}의 피해를 입었다!`
+            )
+          );
+          if (player.hp <= 0) {
+            await delay(500);
+            logs.push(chalk.redBright(`\n${player.name}은(는) 쓰러졌다...!`));
+            await delay(500);
+            logs.push(chalk.white(`당신은 눈앞이 깜깜해졌다!`));
+            await delay(500);
+            console.clear();
+            displayStatus(stage, player, monster);
+            logs.forEach((log) => console.log(log));
+            console.log(
+              chalk.yellow("피카로그를 재도전 하실꺼면 1을 누르세요.")
+            );
+            console.log(chalk.yellow("피카로그를 포기하려면 2를 누르세요."));
+            const choice = readlineSync.question("당신의 선택은? ");
+
+            if (choice === "1") {
+              console.log(chalk.green("피카로그를 재도전 합니다..."));
+              await delay(500);
+              console.log(chalk.green("Good Luck...!"));
+              await delay(1500);
+              return "restart"; // 재시작 선택 시 "restart" 반환
+            } else {
+              console.log(chalk.green("게임을 종료합니다. 감사합니다!"));
+              return "quit"; // 포기 선택 시 "quit" 반환
+            }
+          }
+        } else {
+          logs.push(
+            chalk.blue(
+              `야생의 ${monster.name}이(가) ${monsterAttack.skillName}를 사용했지만 빗나갔다!`
+            )
+          );
+        }
       }
     }
 
+    // 배틀중에 로그에 나타나는 상태창
     logs.push(
       chalk.blueBright(`| ${player.name}의 HP : ${player.hp} `) +
         chalk.redBright(`| ${monster.name}의 HP : ${monster.hp}|`)
@@ -292,18 +384,18 @@ export async function startGame() {
   console.clear();
 
   // 인트로 메시지 추가
-  await typeEffect(
-    "당신은 앞으로 피카츄와 함께 10개의 스테이지를 도전하게됩니다.\n",
-    50
-  );
-  await delay(1000); // 1초 대기 후 게임 시작
-  await typeEffect(
-    "10개의 스테이지를 클리어하고 최고의 포켓몬에 도전하세요!\n",
-    50
-  );
-  await delay(1000); // 1초 대기 후 게임 시작
-  await typeEffect("그럼, 행운을 빕니다! Good Luck!\n", 50);
-  await delay(2000); // 1초 대기 후 게임 시작
+  // await typeEffect(
+  //   "당신은 앞으로 피카츄와 함께 10개의 스테이지를 도전하게됩니다.\n",
+  //   50
+  // );
+  // await delay(1000); // 1초 대기 후 게임 시작
+  // await typeEffect(
+  //   "10개의 스테이지를 클리어하고 최고의 포켓몬에 도전하세요!\n",
+  //   50
+  // );
+  // await delay(1000); // 1초 대기 후 게임 시작
+  // await typeEffect("그럼, 행운을 빕니다! Good Luck!\n", 50);
+  // await delay(2000); // 1초 대기 후 게임 시작
 
   const player = new Player();
   let stage = 1;
